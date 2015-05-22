@@ -17,6 +17,7 @@ package main
 import (
 	"flag"
 	"fmt"
+	"io/ioutil"
 	"net/http"
 	gourl "net/url"
 	"os"
@@ -68,7 +69,7 @@ Options:
   -h  Custom HTTP headers, name1:value1;name2:value2.
   -t  Timeout in ms.
   -A  HTTP Accept header.
-  -d  HTTP request body.
+  -d  HTTP request body. If you start the data with the letter @, the rest should be a file name to read the data from.
   -T  Content-type, defaults to "text/html".
   -a  Basic authentication, username:password.
   -x  HTTP Proxy address as host:port.
@@ -144,6 +145,10 @@ func main() {
 		}
 	}
 
+	reqBody, err := parseReqBody(*body)
+	if err != nil {
+		usageAndExit(err.Error())
+	}
 	req, err := http.NewRequest(method, url, nil)
 	if err != nil {
 		usageAndExit(err.Error())
@@ -155,7 +160,7 @@ func main() {
 
 	(&boomer.Boomer{
 		Request:            req,
-		RequestBody:        *body,
+		RequestBody:        reqBody,
 		N:                  num,
 		C:                  conc,
 		Qps:                q,
@@ -184,4 +189,16 @@ func parseInputWithRegexp(input, regx string) ([]string, error) {
 		return nil, fmt.Errorf("could not parse the provided input; input = %v", input)
 	}
 	return matches, nil
+}
+
+func parseReqBody(arg string) (string, error) {
+	if arg == "" || arg[0] != '@' {
+		return arg, nil
+	}
+
+	contents, err := ioutil.ReadFile(arg[1:])
+	if err != nil {
+		return "", err
+	}
+	return string(contents), nil
 }
